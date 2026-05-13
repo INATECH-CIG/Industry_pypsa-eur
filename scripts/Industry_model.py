@@ -3,23 +3,36 @@ import pandas as pd
 import numpy as numpy
 import geopandas as gpd
 
-def industry_module(n, steel_load, hvc_load, cement_load, methanol_load,
-    steel_energy, steel_feedstock, steel_cost,
-    hvc_energy, hvc_feedstock, hvc_cost,
-    cement_energy, cement_feedstock, cement_cost,                       
-    max_waste, max_packaging_waste, max_scrap, 
-    sectors = ["cement", "hvc", "steel"], 
-    ): 
-   
-    ############################################################
-    # choose AC nodes to attach industry links to
-    ############################################################
-    nodes = n.buses[n.buses.carrier == "AC"].filter(like = "DE", axis = 0).index
+DEFAULT_STEEL_FLEXIBILITY = {
+    # TODO: Replace these first-pass flexibility assumptions with literature-
+    # backed process values. ISW is kept fully must-run for now; DRI and EAF
+    # also need revised must-run and ramp-rate values before publication use.
+    "ISW": {"must_run": 1.0, "ramp_limit_up": 0.05, "ramp_limit_down": 0.05},
+    "H2-DRI+EAF": {"must_run": 0.5, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
+    "NG-DRI+EAF": {"must_run": 0.5, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
+    "EAF": {"must_run": 0.0, "ramp_limit_up": 1.0, "ramp_limit_down": 1.0},
+}
 
-    ############################################################
-    # Add steel: carrier, bus, links (processes), loads, 
-    # + steel scrap: carrier, bus, store
-    ############################################################
+
+def get_steel_process_flexibility(process, steel_flexibility=None):
+    values = DEFAULT_STEEL_FLEXIBILITY.get(
+        process,
+        {"must_run": 0.0, "ramp_limit_up": 1.0, "ramp_limit_down": 1.0},
+    ).copy()
+    if steel_flexibility and process in steel_flexibility:
+        values.update(steel_flexibility[process])
+    return values
+
+
+def add_steel_production(
+    n,
+    steel_load,
+    steel_energy,
+    steel_feedstock,
+    max_scrap,
+    steel_flexibility=None,
+    steel_storage_hours=168,
+):
     n.add("Carrier",
             name="steel")
 
@@ -33,16 +46,31 @@ def industry_module(n, steel_load, hvc_load, cement_load, methanol_load,
             p_set=steel_load*1e3/8760, # kt -> t, 1yr -> 1h
             carrier="steel")
 
+    n.add("Store",
+            name="DE steel inventory",
+            bus="DE steel",
+            carrier="steel",
+            e_nom=steel_load*1e3*steel_storage_hours/8760,
+            e_nom_max=steel_load*1e3,
+            e_nom_extendable=True,
+            e_cyclic=True,
+            capital_cost=0)
+
+    nodes = n.buses[n.buses.carrier == "AC"].filter(like = "DE", axis = 0).index
+
     for p in steel_energy.columns:
         n.add("Carrier",
             name="steel "+p)
+        flex = get_steel_process_flexibility(p, steel_flexibility)
         
         for node in nodes:
             n.add("Link",
                 name=node+" steel "+p,
                 p_nom_extendable=True,
-                p_min_pu=1,
+                p_min_pu=flex["must_run"],
                 p_max_pu=1,
+                ramp_limit_up=flex["ramp_limit_up"],
+                ramp_limit_down=flex["ramp_limit_down"],
                 carrier="steel "+p,
                 bus0=node,
                 bus1="DE steel",
@@ -73,6 +101,38 @@ def industry_module(n, steel_load, hvc_load, cement_load, methanol_load,
             e_initial=max_scrap*1e3,
             e_nom=max_scrap*1e3,
             e_nom_extendable=False)
+
+    return n
+
+
+def industry_module(n, steel_load, hvc_load, cement_load, methanol_load,
+    steel_energy, steel_feedstock, steel_cost,
+    hvc_energy, hvc_feedstock, hvc_cost,
+    cement_energy, cement_feedstock, cement_cost,                       
+    max_waste, max_packaging_waste, max_scrap, 
+    steel_flexibility=None,
+    steel_storage_hours=168,
+    sectors = ["cement", "hvc", "steel"], 
+    ): 
+   
+    ############################################################
+    # choose AC nodes to attach industry links to
+    ############################################################
+    nodes = n.buses[n.buses.carrier == "AC"].filter(like = "DE", axis = 0).index
+
+    ############################################################
+    # Add steel: carrier, bus, links (processes), loads, 
+    # + steel scrap: carrier, bus, store
+    ############################################################
+    n = add_steel_production(
+        n,
+        steel_load,
+        steel_energy,
+        steel_feedstock,
+        max_scrap,
+        steel_flexibility=steel_flexibility,
+        steel_storage_hours=steel_storage_hours,
+    )
 
     ############################################################
     # Add hvc: carrier, bus, links (processes), loads

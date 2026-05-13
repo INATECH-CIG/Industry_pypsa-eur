@@ -119,6 +119,7 @@ import os
 from pypsa.optimization.compat import define_constraints, get_var, linexpr
 from Industry_input import steel_input, cement_input, chem_input
 from Industry_model import industry_module, add_process_heat
+from Industry_constraints import add_annual_steel_production_constraint
 
 ############################################################
 # Load Input Data and basic network
@@ -742,8 +743,11 @@ n.add("Link", "DE methanol for industry", bus0 = "DE methanol", bus1 = "DE metha
 ############################################################
 # function to solve: add constraints: co2 = 0 at last t
 ############################################################
-def solve_industry_module(n, co2_cap, snapshots = n.snapshots): 
-        
+def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load = None): 
+   
+    if steel_annual_load is None:
+        steel_annual_load = steel_load
+
     #n.optimize.create_model()
    
     # co2 constraint
@@ -760,6 +764,14 @@ def solve_industry_module(n, co2_cap, snapshots = n.snapshots):
     def extra_functionalities(n, snapshots):
         co2_constraint(n, snapshots)
         co2_de_constraint(n, snapshots)
+        add_annual_steel_production_constraint(
+            n,
+            snapshots,
+            steel_annual_load,
+            define_constraints,
+            get_var,
+            linexpr,
+        )
 
     n.optimize(solver_name="gurobi", snapshots = snapshots, 
                extra_functionality = extra_functionalities,
