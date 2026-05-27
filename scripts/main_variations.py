@@ -119,7 +119,10 @@ import os
 from pypsa.optimization.compat import define_constraints, get_var, linexpr
 from Industry_input import steel_input, cement_input, chem_input
 from Industry_model import industry_module, add_process_heat
-from Industry_constraints import add_annual_steel_production_constraint
+from Industry_constraints import (
+    add_annual_steel_production_constraint,
+    scale_steel_scrap_availability,
+)
 
 ############################################################
 # Load Input Data and basic network
@@ -743,10 +746,14 @@ n.add("Link", "DE methanol for industry", bus0 = "DE methanol", bus1 = "DE metha
 ############################################################
 # function to solve: add constraints: co2 = 0 at last t
 ############################################################
-def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load = None): 
+def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load = None, annual_max_scrap = None): 
    
     if steel_annual_load is None:
         steel_annual_load = steel_load
+    if annual_max_scrap is None:
+        annual_max_scrap = max_scrap
+
+    scale_steel_scrap_availability(n, snapshots, annual_max_scrap)
 
     #n.optimize.create_model()
    
@@ -818,10 +825,15 @@ if coupling == "coupled":
     ############################################################
     replace_nan_in_links(n)
     network_path = "../results/pre-networks/"
+    os.makedirs(network_path, exist_ok=True)
     n.export_to_netcdf(network_path + name + ".nc")  
     
     ns = solve_industry_module(n, co2_cap = co2_cap, 
                 snapshots = n.snapshots[0:6])
+    
+    network_path = "../results/post-networks/"
+    os.makedirs(network_path, exist_ok=True)
+    ns.export_to_netcdf(network_path + "solved_" + name + ".nc")
     
 ############################################################
 # B1. ESM ONLY (start)

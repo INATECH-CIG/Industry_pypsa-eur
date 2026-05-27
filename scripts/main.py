@@ -38,10 +38,14 @@ import os
 from pypsa.optimization.compat import define_constraints, get_var, linexpr
 from Industry_input import steel_input, cement_input, chem_input
 from Industry_model import industry_module, add_process_heat
-from Industry_constraints import add_annual_steel_production_constraint
+from Industry_constraints import (
+    add_annual_steel_production_constraint,
+    scale_steel_scrap_availability,
+)
 
 ############################################################
-# Load Input Data and basic network
+# Load Input Data and basic network 
+#Move this whole block to a config
 ############################################################
 
 file_path = "../data/industry_sector_ratios_DE_MWh_per_t.csv"
@@ -63,6 +67,9 @@ cement_load, cement_load_today, cement_feedstock, cement_energy, cement_cost = c
 
 networkname = "../data/pre-networks-input/endogenousind/elec_s_15_lv1.5__Co2L0-3H-T-H-B-I-A-solar+p3-dist1_2045.nc"
 n = pypsa.Network(networkname)
+
+test_snapshots = n.snapshots[0:180]
+n.set_snapshots(test_snapshots)
 
 #costs = pd.read_csv("../data/prepared_costs.csv", index_col = 0)
 costs = pd.read_csv("../data/pypsa-eur/costs_2045.csv", index_col = [0,1], delimiter = ";")["value"]
@@ -646,10 +653,14 @@ n.add("Link", "DE methanol for industry", bus0 = "DE methanol", bus1 = "DE metha
 ############################################################
 # function to solve: add constraints: co2 = 0 at last t
 ############################################################
-def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load = None): 
+def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load = None, annual_max_scrap = None): 
    
     if steel_annual_load is None:
         steel_annual_load = steel_load
+    if annual_max_scrap is None:
+        annual_max_scrap = max_scrap
+
+    scale_steel_scrap_availability(n, snapshots, annual_max_scrap)
 
     # co2 constraint
     def co2_constraint(n, snapshots):
@@ -673,9 +684,11 @@ def solve_industry_module(n, co2_cap, snapshots = n.snapshots, steel_annual_load
             get_var,
             linexpr,
         )
-
+    #for larger models remove io_api direct, this is only for short runs
+    #move to config later
     n.optimize(solver_name="gurobi", snapshots = snapshots, 
                extra_functionality = extra_functionalities,
+               io_api="direct",
                solver_options= {"threads": 4, "method": 2, "crossover": 0,
                 "BarConvTol": 1e-6,
                 "Seed": 123,
@@ -719,10 +732,14 @@ if coupling == "coupled":
     ############################################################
     replace_nan_in_links(n)
     network_path = "../results/pre-networks/"
+    os.makedirs(network_path, exist_ok=True)
     n.export_to_netcdf(network_path + name + ".nc")  
     
-    ns = solve_industry_module(n, co2_cap = co2_cap, 
-                snapshots = n.snapshots[0:6])
+    ns = solve_industry_module(n, co2_cap=co2_cap, snapshots=n.snapshots)
+    
+    network_path = "../results/post-networks/"
+    os.makedirs(network_path, exist_ok=True)
+    ns.export_to_netcdf(network_path + "solved_" + name + ".nc")
     
 ############################################################
 # B1. ESM ONLY (start)
@@ -770,7 +787,7 @@ if coupling == "esm_only":
     n.export_to_netcdf(network_path + name + ".nc")  
 
     # test if feasible for first 6 time steps
-    ns = solve_industry_module(n, co2_cap = co2_cap, snapshots = n.snapshots[0:6])
+    ns = solve_industry_module(n, co2_cap=co2_cap, snapshots=n.snapshots)
     # if not feasible, show infeasible constraints
     infeasibilities(n)
 
@@ -900,7 +917,7 @@ if coupling == "industry_only":
     replace_nan_in_links(n)
     network_path = "../results/pre-networks/"
     n.export_to_netcdf(network_path + name + ".nc") 
-    ns = solve_industry_module(n, co2_cap = co2_cap, snapshots = n.snapshots)
+    ns = solve_industry_module(n, co2_cap=co2_cap, snapshots=n.snapshots)
     # for sensitivities
     #if sensitivity:
     #    network_path = "../post-networks-sensitivity/"
@@ -1155,5 +1172,5 @@ if coupling == "esm_softlinked":
     n.export_to_netcdf(network_path + name + ".nc")  
 
     # test if feasible for first 6 time steps
-    ns = solve_industry_module(n, co2_cap = 0, snapshots = n.snapshots[0:6])
+    ns = solve_industry_module(n, co2_cap=co2_cap, snapshots=n.snapshots)
                

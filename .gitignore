@@ -1,0 +1,4 @@
+results/
+scripts/_pycache_/
+/scripts/__pycache__
+/tests/__pycache__

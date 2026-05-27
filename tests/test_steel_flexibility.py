@@ -16,6 +16,9 @@ sys.modules.setdefault("geopandas", types.SimpleNamespace())
 from Industry_constraints import (  # noqa: E402
     add_annual_steel_production_constraint,
     annual_steel_target,
+    infer_snapshot_step_hours,
+    represented_hours,
+    scale_steel_scrap_availability,
     steel_process_links,
 )
 from Industry_model import (  # noqa: E402
@@ -85,9 +88,12 @@ class SteelFlexibilityTests(unittest.TestCase):
         )
 
         stores = {name: kwargs for component, name, kwargs in n.calls if component == "Store"}
+        loads = {name: kwargs for component, name, kwargs in n.calls if component == "Load"}
         self.assertIn("DE steel inventory", stores)
+        self.assertNotIn("DE steel demand", loads)
         self.assertTrue(stores["DE steel inventory"]["e_nom_extendable"])
-        self.assertTrue(stores["DE steel inventory"]["e_cyclic"])
+        self.assertFalse(stores["DE steel inventory"]["e_cyclic"])
+        self.assertEqual(stores["DE steel inventory"]["e_initial"], 0)
 
         self.assertEqual(n.links.loc["DE1 0 steel ISW", "p_min_pu"], 1.0)
         self.assertEqual(n.links.loc["DE1 0 steel EAF", "p_min_pu"], 0.0)
@@ -145,6 +151,30 @@ class SteelFlexibilityTests(unittest.TestCase):
         self.assertEqual(captured["rhs"], annual_steel_target(n, snapshots, 8760))
         self.assertEqual(captured["rhs"], 6000)
         self.assertEqual(captured["lhs"], 4.5)
+
+    def test_scrap_availability_scales_with_snapshot_weightings(self):
+        snapshots = pd.Index(["t0", "t1", "t2"])
+        n = types.SimpleNamespace()
+        n.stores = pd.DataFrame(index=["DE steel scrap"], columns=["e_initial", "e_nom", "e_nom_max"])
+        n.snapshot_weightings = pd.DataFrame({"objective": [2.0, 2.0, 2.0]}, index=snapshots)
+
+        scale_steel_scrap_availability(n, snapshots, max_scrap=8760)
+
+        self.assertEqual(represented_hours(n, snapshots), 6.0)
+        self.assertEqual(n.stores.loc["DE steel scrap", "e_initial"], 6000)
+        self.assertEqual(n.stores.loc["DE steel scrap", "e_nom"], 6000)
+        self.assertEqual(n.stores.loc["DE steel scrap", "e_nom_max"], 6000)
+
+    def test_snapshot_duration_is_inferred_for_subhourly_datetime_snapshots_without_weights(self):
+        snapshots = pd.date_range("2045-01-01", periods=4, freq="15min")
+        n = types.SimpleNamespace()
+        n.stores = pd.DataFrame(index=["DE steel scrap"], columns=["e_initial", "e_nom"])
+
+        scale_steel_scrap_availability(n, snapshots, max_scrap=8760)
+
+        self.assertEqual(infer_snapshot_step_hours(snapshots), 0.25)
+        self.assertEqual(represented_hours(n, snapshots), 1.0)
+        self.assertEqual(n.stores.loc["DE steel scrap", "e_initial"], 1000)
 
 
 if __name__ == "__main__":

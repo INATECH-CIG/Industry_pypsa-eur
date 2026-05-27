@@ -40,20 +40,15 @@ def add_steel_production(
             name="DE steel",
             carrier="steel")
 
-    n.add("Load",
-            name="DE steel demand",
-            bus="DE steel",
-            p_set=steel_load*1e3/8760, # kt -> t, 1yr -> 1h
-            carrier="steel")
-
     n.add("Store",
             name="DE steel inventory",
             bus="DE steel",
             carrier="steel",
-            e_nom=steel_load*1e3*steel_storage_hours/8760,
+            e_initial=0,
+            e_nom=steel_load*1e3,
             e_nom_max=steel_load*1e3,
             e_nom_extendable=True,
-            e_cyclic=True,
+            e_cyclic=False,
             capital_cost=0)
 
     nodes = n.buses[n.buses.carrier == "AC"].filter(like = "DE", axis = 0).index
