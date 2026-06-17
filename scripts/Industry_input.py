@@ -23,6 +23,7 @@ def pypsa_industry_data():
     costs = pd.read_csv("../data/pypsa-eur/costs_2045.csv", index_col = [0,1], delimiter = ";")["value"]
     return industry_sector_ratios, outputs_today_pypsa, outputs_tomorrow_pypsa, costs
 # industry model data =============================================
+
 # steel
 def steel_input(use_pypsa_data = True, years = range(2020, 2046)):
     
@@ -55,12 +56,14 @@ def steel_input(use_pypsa_data = True, years = range(2020, 2046)):
     steel_feedstock["NG-DRI+EAF"] = steel_feedstock["H2-DRI+EAF"] 
     steel_energy.columns = ["EAF", "H2-DRI+EAF", "ISW"]  
     steel_energy["NG-DRI+EAF"] = steel_energy["H2-DRI+EAF"] 
+    #Wo kommt der Wassterstoff rein? in den data_industry.xlsx gibt es keinen Eintrag für H2 --> kommt später im industry_model.py 1.7 MWh/t
     steel_energy.loc["methane", "NG-DRI+EAF"] = steel_energy.loc["hydrogen", "H2-DRI+EAF"]   
     steel_energy.loc["hydrogen", "NG-DRI+EAF"] = 0
     steel_energy.loc["process emission", "ISW"] += (
     steel_energy.loc["coal", "ISW"]
     *costs.loc["coal", "CO2 intensity"])  
-       
+
+
     steel_prod_proj = pd.Series(index=years, data = [steel_output_today for y in years])
     #max_scrap, min_scrap = steel_limit_scrap(steel_prod_proj*1000, 2045) #steel_prod_proj in t
     df = calculate_secondary("steel", steel_prod_proj)
@@ -287,4 +290,4 @@ def calculate_secondary(product, production):
         for y in range(2035,2046):
             df.loc[y,'waste [Mt]'] = 31.231218
 
-    return df.loc[years]*1e3 # in kt
+    return df.loc[years]*1e3 # in kt    

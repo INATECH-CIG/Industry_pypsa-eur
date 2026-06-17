@@ -3,14 +3,15 @@ import pandas as pd
 import numpy as numpy
 import geopandas as gpd
 
+#MOve to config
 DEFAULT_STEEL_FLEXIBILITY = {
     # TODO: Replace these first-pass flexibility assumptions with literature-
     # backed process values. ISW is kept fully must-run for now; DRI and EAF
     # also need revised must-run and ramp-rate values before publication use.
     "ISW": {"must_run": 1.0, "ramp_limit_up": 0.05, "ramp_limit_down": 0.05},
-    "H2-DRI+EAF": {"must_run": 0.5, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
-    "NG-DRI+EAF": {"must_run": 0.5, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
-    "EAF": {"must_run": 0.0, "ramp_limit_up": 1.0, "ramp_limit_down": 1.0},
+    "H2-DRI+EAF": {"must_run": 0.7, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
+    "NG-DRI+EAF": {"must_run": 0.7, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
+    "EAF": {"must_run": 0.0, "ramp_limit_up": 0.2, "ramp_limit_down": 0.2},
 }
 
 
@@ -40,6 +41,7 @@ def add_steel_production(
             name="DE steel",
             carrier="steel")
 
+    #storage for steel
     n.add("Store",
             name="DE steel inventory",
             bus="DE steel",
