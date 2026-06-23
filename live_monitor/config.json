@@ -1,0 +1,40 @@
+{
+  "refresh_seconds": 30,
+  "oil_refresh_seconds": 1,
+  "item_limit": 4,
+  "keywords": ["iran", "israel", "war", "tehran", "nuclear", "hormuz", "hezbollah"],
+  "oil": {
+    "label": "Brent Oil first nearby future",
+    "symbol": "LCOQ6",
+    "investing_url": "https://www.investing.com/commodities/brent-oil",
+    "fallback_yahoo_symbol": "BZ=F"
+  },
+  "sources": [
+    {
+      "id": "truth_trump",
+      "label": "Donald Trump on Truth Social",
+      "type": "truthsocial",
+      "url": "https://truthsocial.com/api/v1/accounts/107780257626128497/statuses?exclude_replies=false&with_muted=true&limit=20"
+    },
+    {
+      "id": "iranintl_live",
+      "label": "Iran International liveblog",
+      "type": "liveblog",
+      "url": "https://www.iranintl.com/en/liveblog/202606139149"
+    },
+    {
+      "id": "aljazeera_rss",
+      "label": "Al Jazeera Iran war liveblog",
+      "type": "rss_liveblog",
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "title_patterns": ["Iran war day", "US-Iran", "Iran", "Hormuz"],
+      "url_contains": "/news/"
+    },
+    {
+      "id": "reuters_search",
+      "label": "Reuters Iran updates",
+      "type": "rss",
+      "url": "https://news.google.com/rss/search?q=site%3Areuters.com%20Iran%20war&hl=en-US&gl=US&ceid=US%3Aen"
+    }
+  ]
+}
