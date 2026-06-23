@@ -76,13 +76,31 @@ params["ammonia_production_today"] = 3125
 params["methanol_production_today"] = 1520 #in config in Mt
 #params["petrochemical_process_emissions"]
 #params["NH3_process_emissions"]
+
+
+###Chemical production process parameters Finn
+#based on P.57 978-3-89746-196-2 Low carbon energy and feedstock for the European chemical industry
+#178kg H2/tNH3
+#https://en.wikipedia.org/wiki/Energy_density
+# H2 = 33.313kWh/kg - 39.4056 kWh/kg (lower and higher heating value)
+#178kg*33.33Kwh/kg = 5933.74kWh/tNH3 = 5.93MWh/tNH3
+#178kg*39.4056kWh/kg = 7010.2kWh/tNH3 = 7.01MWh/tNH3
+
+
+#########################################################################
+#AUs Pypsa Config, PYPSA GIBT SELBST KEINE QUELLE DAFÜR AN#
+#params["MWh_NH3_per_tNH3"] = 5.166
 params["MWh_NH3_per_tNH3"] = 5.166
 params["MWh_CH4_per_tNH3_SMR"] = 10.8
 params["MWh_elec_per_tNH3_SMR"] = 0.7
+#exactly between 5.93 and 7.01, which is the range for the H2 demand for ammonia production, depending on the energy density of H2 (lower or higher heating value)
 params["MWh_H2_per_tNH3_electrolysis"] = 6.5
 params["MWh_elec_per_tNH3_electrolysis"] =1.17
+#negative steam balance requires additional electricity for steam generation
 params["MWh_NH3_per_MWh_H2_cracker"] = 1.46 # https://github.com/euronion/trace/blob/44a5ff8401762edbef80eff9cfe5a47c8d3c8be4/data/efficiencies.csv
 params["NH3_process_emissions"] = 24.5 #kt
+
+
 params["MWh_elec_per_tHVC_mechanical_recycling"] = 0.547
 params["MWh_elec_per_tHVC_chemical_recycling"] = 6.9
 
@@ -114,13 +132,27 @@ Al_primary_fraction = {
     2050: 0.2}
 
 params["MWh_H2_per_tCl"] = -0.9372
-params["MWh_elec_per_tCl"] = 3.6
-params["MWh_elec_per_tMeOH"] = 0.167
-params["MWh_CH4_per_tMeOH"] = 10.25
+#Electricity demand for Cl2 production with Mercury  cell
+#params["MWh_elec_per_tCl"] = 3.6
+#Electricity demand for Cl2 production with Membrane/ODC cell which is BAT in terms of energy efficiency P.43 978-3-89746-196-2
+params["MWh_elec_per_tCl"] = 2.25
+
+# this seems like the fossil route  numbers roughly match with P.65 978-3-89746-196-2. CH4 could also be biogas
+#params["MWh_elec_per_tMeOH"] = 0.167
+#params["MWh_CH4_per_tMeOH"] = 10.25
+#Power to Methanol (PtMeOH) route: 978-3-89746-196-2 P.65 189kg H2/tMeOh with 36kWh/kg H2
+params["MWh_H2_per_tMeOH"] = 6.8
+#negative steam balance -2GJ P.65 978-3-89746-196-2, which is -0.55 MWh/tMeOH, which means that additional electricity is needed for steam generation
+params["MWh_steam_per_tMeOH"] = -0.55
+params["MWh_elec_per_tMeOH"] = 1.388
+
+
+
 params["H2_DRI"] = 1.7
 params["elec_DRI"] = 0.322
 # GWh/ktoe OR MWh/toe
 toe_to_MWh = 11.630
+#BIS HIER HIN AUS PYPSA CONFIG ÜBERNOMMEN
 
 eu28 = [
     "FR",
@@ -1337,7 +1369,8 @@ def basic_chemicals():
     methanol_total = params["methanol_production_today"]
     df.loc["methane", name] = params["MWh_CH4_per_tMeOH"]
     df.loc["elec", name] = params["MWh_elec_per_tMeOH"]
-    df.loc["process emission", name] = 0 # process emissions are in feedstock   
+    #also needs CO2, we assume that it will be available from process emissions of other industrial processes nearby needs -0.79 and emits 0.123 P.65 978-3-89746-196-2
+    df.loc["process emission", name] = -0.79 # process emissions are in feedstock   
     df_totals[name] = df[name]*methanol_total*1e3
     df.loc["production (kt)", name] = methanol_total
 
